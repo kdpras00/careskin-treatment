@@ -89,16 +89,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/recommendations", async (req, res) => {
     try {
       const { questionnaire, analysis } = req.body;
-      
+
       // Get all products
       const allProducts = await storage.getAllProducts();
-      
+
       // Simple recommendation logic based on skin type and concerns
       const recommendations = allProducts.filter(product => {
-        const matchesSkinType = product.skinTypes?.includes("all") || 
-                               product.skinTypes?.includes(analysis?.skinType?.toLowerCase());
-        const matchesConcerns = product.concerns?.some(concern => 
-          questionnaire.primaryConcern?.includes(concern) || 
+        const matchesSkinType = product.skinTypes?.includes("all") ||
+          product.skinTypes?.includes(analysis?.skinType?.toLowerCase());
+        const matchesConcerns = product.concerns?.some(concern =>
+          questionnaire.primaryConcern?.includes(concern) ||
           analysis?.concerns?.includes(concern)
         );
         return matchesSkinType || matchesConcerns;
