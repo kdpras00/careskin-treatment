@@ -6,6 +6,10 @@ import { Star, ShoppingCart, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Product } from "@shared/schema";
 
+interface ProductCatalogProps {
+  personalizedProducts?: any[];
+}
+
 const categories = [
   { id: "all", name: "Semua Produk" },
   { id: "cleanser", name: "Pembersih" },
@@ -21,16 +25,33 @@ const categoryColors = {
   sunscreen: "bg-accent/10 text-accent",
 };
 
-export default function ProductCatalog() {
+export default function ProductCatalog({ personalizedProducts }: ProductCatalogProps) {
   const [activeCategory, setActiveCategory] = useState("all");
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["/api/products"],
+  const { data, isLoading } = useQuery<Product[]>({
+    queryKey: ["api", "products"],
   });
 
-  const filteredProducts = activeCategory === "all" 
-    ? products 
-    : products.filter((product: Product) => product.category === activeCategory);
+  let products = data || [];
+
+  // If we have personalized products, merge them with the API products
+  // or use them as fallback if API fails
+  if (personalizedProducts?.length) {
+    if (products.length === 0) {
+      products = personalizedProducts;
+    } else {
+      // Replace any existing products with the personalized versions
+      const personalizedIds = personalizedProducts.map(p => p.id);
+      products = [
+        ...personalizedProducts,
+        ...products.filter(p => !personalizedIds.includes(p.id))
+      ];
+    }
+  }
+
+  const filteredProducts = activeCategory === "all"
+    ? products
+    : products.filter((product) => product.category === activeCategory);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -62,25 +83,24 @@ export default function ProductCatalog() {
   };
 
   return (
-    <section id="produk" className="py-20 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Katalog Produk CareSkin</h2>
-          <p className="text-xl text-gray-600">Produk skincare berkualitas dengan formulasi dokter berpengalaman</p>
+    <section id="produk" className="py-16 bg-gray-50">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">Katalog Produk CareSkin</h2>
+          <p className="text-lg text-gray-600">Produk skincare berkualitas dengan formulasi dokter berpengalaman</p>
         </div>
 
         {/* Category Filters */}
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
+        <div className="flex flex-wrap justify-center gap-2 mb-10">
           {categories.map((category) => (
             <Button
               key={category.id}
               variant={activeCategory === category.id ? "default" : "outline"}
               onClick={() => setActiveCategory(category.id)}
-              className={`px-6 py-3 rounded-full transition-all duration-300 ${
-                activeCategory === category.id
-                  ? "bg-primary text-white hover:bg-primary/90"
-                  : "bg-white text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`px-5 py-2 rounded-full text-sm transition-all duration-300 ${activeCategory === category.id
+                ? "bg-primary text-white hover:bg-primary/90"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+                }`}
             >
               {category.name}
             </Button>
@@ -88,12 +108,12 @@ export default function ProductCatalog() {
         </div>
 
         {/* Products Grid */}
-        {isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+        {isLoading && products.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
               <Card key={i} className="overflow-hidden">
                 <div className="w-full h-48 bg-gray-200 animate-pulse"></div>
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
                   <div className="h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
                   <div className="h-4 bg-gray-200 rounded animate-pulse mb-4"></div>
@@ -106,55 +126,68 @@ export default function ProductCatalog() {
             ))}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {filteredProducts.map((product: Product) => (
-              <Card key={product.id} className="overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                <div className="w-full h-48 overflow-hidden">
-                  <img 
-                    src={product.imageUrl || "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&h=300&fit=crop"} 
-                    alt={product.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge className={categoryColors[product.category as keyof typeof categoryColors] || "bg-gray-100 text-gray-600"}>
-                      {categories.find(c => c.id === product.category)?.name || product.category}
-                    </Badge>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <div className="flex mr-1">
-                        {renderStars(product.rating || 48)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredProducts.map((product: Product) => {
+              // Check if this is a personalized recommendation
+              const isPersonalized = personalizedProducts?.some(p => p.id === product.id);
+
+              return (
+                <Card
+                  key={product.id}
+                  className={`overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full ${isPersonalized ? 'border-2 border-secondary/20' : ''}`}
+                >
+                  <div className="w-full h-48 overflow-hidden bg-gray-100 relative">
+                    <img
+                      src={product.imageUrl || "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&h=300&fit=crop"}
+                      alt={product.name}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    />
+                    {isPersonalized && (
+                      <div className="absolute top-2 right-2 bg-primary text-white text-xs px-2 py-1 rounded-full">
+                        Direkomendasikan
                       </div>
-                      <span>{((product.rating || 48) / 10).toFixed(1)}</span>
-                    </div>
+                    )}
                   </div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-2">{product.name}</h4>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xl font-bold text-primary">{formatPrice(product.price)}</span>
-                      {product.originalPrice && (
-                        <span className="text-sm text-gray-500 line-through ml-2">
-                          {formatPrice(product.originalPrice)}
-                        </span>
-                      )}
-                      <div className="text-xs text-gray-500">{product.size}</div>
+                  <CardContent className="p-4 flex flex-col flex-grow">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className={`text-xs px-2 py-1 ${categoryColors[product.category as keyof typeof categoryColors] || "bg-gray-100 text-gray-600"}`}>
+                        {categories.find(c => c.id === product.category)?.name || product.category}
+                      </Badge>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <div className="flex mr-1">
+                          {renderStars(product.rating || 48)}
+                        </div>
+                        <span>{((product.rating || 48) / 10).toFixed(1)}</span>
+                      </div>
                     </div>
-                    <Button 
-                      size="sm"
-                      className="bg-primary hover:bg-primary/90 text-white"
-                      onClick={() => {
-                        // Add to cart logic here
-                        console.log("Added to cart:", product.id);
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Tambah
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <h4 className="text-base font-bold text-gray-900 mb-1 line-clamp-1">{product.name}</h4>
+                    <p className="text-gray-600 text-xs mb-3 line-clamp-2 flex-grow">{product.description}</p>
+                    <div className="flex items-center justify-between mt-auto">
+                      <div>
+                        <span className="text-base font-bold text-primary">{formatPrice(product.price)}</span>
+                        {product.originalPrice && (
+                          <div className="text-xs text-gray-500 line-through">
+                            {formatPrice(product.originalPrice)}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500 mt-1">{product.size}</div>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90 text-white text-xs px-2 py-1 h-8"
+                        onClick={() => {
+                          // Add to cart logic here
+                          console.log("Added to cart:", product.id);
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Tambah
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
 
@@ -164,8 +197,8 @@ export default function ProductCatalog() {
           </div>
         )}
 
-        <div className="text-center mt-12">
-          <Button variant="outline" className="px-8 py-3">
+        <div className="text-center mt-10">
+          <Button variant="outline" className="px-6 py-2">
             Lihat Semua Produk <ShoppingCart className="w-4 h-4 ml-2" />
           </Button>
         </div>
